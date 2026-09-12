@@ -1,0 +1,17 @@
+import {createRequire} from 'node:module';
+import {readFile,writeFile,readdir,mkdir} from 'node:fs/promises';
+import path from 'node:path';
+const require=createRequire(import.meta.url);
+const esbuild=require(require.resolve('esbuild',{paths:[require.resolve('drizzle-kit')]}));
+const root=process.cwd();
+const cssDir=path.join(root,'dist/client/_next/static/css');
+const cssFile=(await readdir(cssDir)).find(x=>x.endsWith('.css'));
+if(!cssFile)throw new Error('Build CSS was not found. Run the production build first.');
+const result=await esbuild.build({stdin:{contents:`import React from 'react';import{createRoot}from'react-dom/client';import Terminal from './components/alpine/terminal';createRoot(document.getElementById('root')).render(React.createElement(Terminal));`,resolveDir:root,loader:'js'},bundle:true,write:false,format:'iife',platform:'browser',target:['es2020'],minify:true,jsx:'automatic',tsconfig:path.join(root,'tsconfig.json'),define:{'process.env.NODE_ENV':'"production"'},loader:{'.png':'dataurl','.svg':'dataurl'}});
+let js=result.outputFiles.find(x=>x.path.endsWith('.js'))?.text||result.outputFiles[0].text;
+const image=await readFile(path.join(root,'public/alpine-mint-orb.png'));
+js=js.replaceAll('/alpine-mint-orb.png',`data:image/png;base64,${image.toString('base64')}`).replaceAll('</script>','<\\/script>');
+const css=await readFile(path.join(cssDir,cssFile),'utf8');
+const html=`<!doctype html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><title>Quotex VAP White · BSHAR SALMAT SY</title><style>${css}</style></head><body><div id="root"></div><script>${js}</script></body></html>`;
+const output=path.resolve(process.argv[2]||path.join(root,'Quotex-VAP-White.html'));
+await mkdir(path.dirname(output),{recursive:true});await writeFile(output,html);console.log(output);
